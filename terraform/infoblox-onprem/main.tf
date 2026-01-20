@@ -1,8 +1,8 @@
 ###############################################################################
-# Infoblox On-Prem IP Spaces - Creates overlapping blocks for demo
+# Infoblox On-Prem IP Spaces - Non-overlapping datacenter networks
 ###############################################################################
-# This creates "on-prem" IP spaces in Infoblox that intentionally overlap
-# with AWS ranges to demonstrate overlap detection in Federated IPAM
+# Creates on-prem IP spaces in Infoblox within the 192.168.0.0/16 range
+# matching the On-Prem federated block from config.yaml
 ###############################################################################
 
 terraform {
@@ -38,79 +38,93 @@ variable "realm_id" {
 ###############################################################################
 resource "bloxone_ipam_ip_space" "onprem" {
   name    = "On-Premises-DataCenter"
-  comment = "Simulated on-premises data center IP space"
+  comment = "On-premises datacenter IP space"
 
   default_realms = [var.realm_id]
 
   tags = {
     environment = "on-prem"
-    location    = "datacenter-1"
+    location    = "datacenter"
     managed_by  = "terraform"
   }
 }
 
 ###############################################################################
-# On-Prem Address Blocks - Intentionally overlapping with AWS
+# On-Prem Address Blocks - Within 192.168.0.0/16 range
 ###############################################################################
 
-# This block overlaps with Production (10.100.0.0/16)
-resource "bloxone_ipam_address_block" "onprem_legacy" {
-  address = "10.100.50.0"
+# Server Network
+resource "bloxone_ipam_address_block" "onprem_servers" {
+  address = "192.168.1.0"
   cidr    = 24
-  name    = "Legacy-Server-Network"
+  name    = "Server-Network"
   space   = bloxone_ipam_ip_space.onprem.id
-  comment = "Legacy servers - overlaps with AWS Production"
+  comment = "On-prem server network"
 
   federated_realms = [var.realm_id]
 
   tags = {
     environment = "on-prem"
-    overlap     = "intentional-demo"
-    network     = "legacy"
+    network     = "servers"
   }
 }
 
-# This block overlaps with Development (10.200.0.0/16)
-resource "bloxone_ipam_address_block" "onprem_dev_test" {
-  address = "10.200.100.0"
+# Workstation Network
+resource "bloxone_ipam_address_block" "onprem_workstations" {
+  address = "192.168.10.0"
   cidr    = 24
-  name    = "Dev-Test-Network"
+  name    = "Workstation-Network"
   space   = bloxone_ipam_ip_space.onprem.id
-  comment = "Dev/Test servers - overlaps with AWS Development"
+  comment = "On-prem workstation network"
 
   federated_realms = [var.realm_id]
 
   tags = {
     environment = "on-prem"
-    overlap     = "intentional-demo"
-    network     = "dev-test"
+    network     = "workstations"
+  }
+}
+
+# Management Network
+resource "bloxone_ipam_address_block" "onprem_mgmt" {
+  address = "192.168.100.0"
+  cidr    = 24
+  name    = "Management-Network"
+  space   = bloxone_ipam_ip_space.onprem.id
+  comment = "On-prem management network"
+
+  federated_realms = [var.realm_id]
+
+  tags = {
+    environment = "on-prem"
+    network     = "management"
   }
 }
 
 ###############################################################################
-# On-Prem Subnets within the overlapping blocks
+# On-Prem Subnets
 ###############################################################################
-resource "bloxone_ipam_subnet" "onprem_legacy_subnet" {
-  address = "10.100.50.0"
+resource "bloxone_ipam_subnet" "onprem_servers_subnet" {
+  address = "192.168.1.0"
   cidr    = 26
   space   = bloxone_ipam_ip_space.onprem.id
-  name    = "Legacy-Subnet-1"
+  name    = "Servers-Subnet-1"
 
   tags = {
     subnet_type = "server"
-    vlan        = "100"
+    vlan        = "101"
   }
 }
 
-resource "bloxone_ipam_subnet" "onprem_devtest_subnet" {
-  address = "10.200.100.0"
+resource "bloxone_ipam_subnet" "onprem_workstations_subnet" {
+  address = "192.168.10.0"
   cidr    = 26
   space   = bloxone_ipam_ip_space.onprem.id
-  name    = "DevTest-Subnet-1"
+  name    = "Workstations-Subnet-1"
 
   tags = {
     subnet_type = "workstation"
-    vlan        = "200"
+    vlan        = "110"
   }
 }
 
@@ -122,18 +136,20 @@ output "ip_space_id" {
   value       = bloxone_ipam_ip_space.onprem.id
 }
 
-output "overlapping_blocks" {
-  description = "Overlapping address blocks created"
+output "address_blocks" {
+  description = "On-prem address blocks"
   value = {
-    legacy_network = {
-      id      = bloxone_ipam_address_block.onprem_legacy.id
-      cidr    = "10.100.50.0/24"
-      overlap = "AWS Production (10.100.0.0/16)"
+    servers = {
+      id   = bloxone_ipam_address_block.onprem_servers.id
+      cidr = "192.168.1.0/24"
     }
-    devtest_network = {
-      id      = bloxone_ipam_address_block.onprem_dev_test.id
-      cidr    = "10.200.100.0/24"
-      overlap = "AWS Development (10.200.0.0/16)"
+    workstations = {
+      id   = bloxone_ipam_address_block.onprem_workstations.id
+      cidr = "192.168.10.0/24"
+    }
+    management = {
+      id   = bloxone_ipam_address_block.onprem_mgmt.id
+      cidr = "192.168.100.0/24"
     }
   }
 }
