@@ -27,14 +27,24 @@ output "infoblox_scope_arn" {
   value       = aws_vpc_ipam_scope.infoblox.arn
 }
 
-output "infoblox_pool_id" {
-  description = "The ID of the Infoblox-managed pool"
-  value       = aws_vpc_ipam_pool.infoblox_managed.id
+output "production_pool_id" {
+  description = "The ID of the Production pool"
+  value       = aws_vpc_ipam_pool.production.id
 }
 
-output "infoblox_pool_arn" {
-  description = "The ARN of the Infoblox-managed pool"
-  value       = aws_vpc_ipam_pool.infoblox_managed.arn
+output "production_pool_arn" {
+  description = "The ARN of the Production pool"
+  value       = aws_vpc_ipam_pool.production.arn
+}
+
+output "development_pool_id" {
+  description = "The ID of the Development pool"
+  value       = aws_vpc_ipam_pool.development.id
+}
+
+output "development_pool_arn" {
+  description = "The ARN of the Development pool"
+  value       = aws_vpc_ipam_pool.development.arn
 }
 
 output "aws_account_id" {
@@ -78,10 +88,18 @@ output "summary" {
       external_authority = var.infoblox_resource_identifier != "" ? "infoblox" : "none"
       resource_id        = var.infoblox_resource_identifier
     }
-    pool = {
-      id     = aws_vpc_ipam_pool.infoblox_managed.id
-      locale = var.aws_region
-      note   = "CIDRs provisioned from Infoblox"
+    pools = {
+      production = {
+        id     = aws_vpc_ipam_pool.production.id
+        cidr   = "10.100.0.0/16"
+        locale = var.aws_region
+      }
+      development = {
+        id     = aws_vpc_ipam_pool.development.id
+        cidr   = "10.200.0.0/16"
+        locale = var.aws_region
+      }
+      note = "CIDRs provisioned from Infoblox"
     }
     vpcs = keys(module.vpc)
   }

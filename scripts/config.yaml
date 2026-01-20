@@ -17,46 +17,25 @@ realm:
 
 # Federated blocks representing different environments
 blocks:
-  # AWS block - will be managed via AWS IPAM integration
-  - name: "AWS-Cloud"
+  # Production environment
+  - name: "Production"
     address: "10.100.0.0"
     cidr: 16
-    comment: "AWS Cloud Infrastructure - Managed via AWS IPAM"
+    comment: "Production Environment - AWS"
     tags:
-      env: "lab"
+      env: "production"
       owner: "instruqt"
       provider: "aws"
 
-  # On-premises blocks for overlap detection demo
-  - name: "DataCenter-EU"
-    address: "10.20.0.0"
+  # Development environment
+  - name: "Development"
+    address: "10.200.0.0"
     cidr: 16
-    comment: "European Data Center - On-premises"
+    comment: "Development Environment - AWS"
     tags:
-      env: "lab"
+      env: "development"
       owner: "instruqt"
-      provider: "on-prem"
-      location: "eu"
-
-  - name: "DataCenter-US"
-    address: "192.168.0.0"
-    cidr: 16
-    comment: "US Data Center - On-premises"
-    tags:
-      env: "lab"
-      owner: "instruqt"
-      provider: "on-prem"
-      location: "us"
-
-  # Intentional overlap for demo (same as part of AWS block)
-  - name: "Legacy-Network"
-    address: "10.100.50.0"
-    cidr: 24
-    comment: "Legacy network - INTENTIONAL OVERLAP for demo"
-    tags:
-      env: "lab"
-      owner: "instruqt"
-      overlap: "true"
+      provider: "aws"
 
 # AWS IPAM Configuration
 aws_ipam:

@@ -117,18 +117,36 @@ resource "null_resource" "configure_infoblox_authority" {
   }
 }
 
-# IPAM Pool in Infoblox-Managed Scope
-resource "aws_vpc_ipam_pool" "infoblox_managed" {
+# IPAM Pools in Infoblox-Managed Scope
+# Production Pool - 10.100.0.0/16
+resource "aws_vpc_ipam_pool" "production" {
   depends_on = [aws_vpc_ipam_scope.infoblox]
 
   ipam_scope_id  = aws_vpc_ipam_scope.infoblox.id
   address_family = "ipv4"
-  description    = "Pool managed by Infoblox UDDI"
+  description    = "Production Environment Pool - Infoblox UDDI"
   locale         = var.aws_region
 
   tags = merge(local.common_tags, {
-    Name   = "infoblox-managed-pool"
-    Source = "infoblox-uddi"
+    Name        = "production-pool"
+    Environment = "production"
+    Source      = "infoblox-uddi"
+  })
+}
+
+# Development Pool - 10.200.0.0/16
+resource "aws_vpc_ipam_pool" "development" {
+  depends_on = [aws_vpc_ipam_scope.infoblox]
+
+  ipam_scope_id  = aws_vpc_ipam_scope.infoblox.id
+  address_family = "ipv4"
+  description    = "Development Environment Pool - Infoblox UDDI"
+  locale         = var.aws_region
+
+  tags = merge(local.common_tags, {
+    Name        = "development-pool"
+    Environment = "development"
+    Source      = "infoblox-uddi"
   })
 }
 
