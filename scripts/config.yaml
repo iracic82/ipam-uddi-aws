@@ -17,28 +17,18 @@ realm:
 
 # Federated blocks representing different environments
 blocks:
-  # AWS Cloud - Production
-  - name: "AWS-Production"
-    address: "10.100.0.0"
-    cidr: 16
-    comment: "AWS Production Environment"
+  # AWS Cloud - Top-level block
+  - name: "AWS"
+    address: "10.0.0.0"
+    cidr: 8
+    comment: "AWS Cloud IP Space"
     tags:
-      env: "production"
+      env: "cloud"
       owner: "instruqt"
       provider: "aws"
 
-  # AWS Cloud - Development
-  - name: "AWS-Development"
-    address: "10.200.0.0"
-    cidr: 16
-    comment: "AWS Development Environment"
-    tags:
-      env: "development"
-      owner: "instruqt"
-      provider: "aws"
-
-  # On-Prem DataCenter - Clean space
-  - name: "On-Prem-DC"
+  # On-Prem DataCenter
+  - name: "On-Prem"
     address: "192.168.0.0"
     cidr: 16
     comment: "On-Prem DataCenter Network"
@@ -46,17 +36,6 @@ blocks:
       env: "on-prem"
       owner: "instruqt"
       provider: "datacenter"
-
-  # On-Prem Legacy - SAME RANGE as AWS-Production = TRUE OVERLAP
-  - name: "On-Prem-Legacy"
-    address: "10.100.0.0"
-    cidr: 16
-    comment: "Legacy DC Network - OVERLAPS with AWS Production"
-    tags:
-      env: "on-prem"
-      owner: "instruqt"
-      provider: "datacenter"
-      overlap: "intentional-demo"
 
 # AWS IPAM Configuration
 aws_ipam:
