@@ -1,61 +1,63 @@
 ###############################################################################
-# AWS IPAM + Infoblox Integration - Variables
+# AWS IPAM Lab - Variables
 ###############################################################################
 
 variable "aws_region" {
-  description = "AWS region for IPAM deployment"
+  description = "AWS region"
   type        = string
   default     = "eu-west-1"
 }
 
-variable "aws_profile" {
-  description = "AWS CLI profile to use"
+variable "instance_type" {
+  description = "EC2 instance type"
   type        = string
-  default     = "okta-sso"
+  default     = "t3.micro"
 }
 
-variable "ipam_name" {
-  description = "Name tag for the IPAM"
-  type        = string
-  default     = "federated-ipam-lab"
-}
-
-variable "ipam_description" {
-  description = "Description for the IPAM"
-  type        = string
-  default     = "Federated IPAM Lab - Infoblox Integration"
-}
-
-variable "infoblox_resource_identifier" {
-  description = "Infoblox resource identifier for external authority (format: <version>.identity.account.<entity_realm>.<entity_id>)"
-  type        = string
-  # Example: blox0.identity.account.us-com-1.ivmfiurrgyyteiba
-}
-
-variable "scope_name" {
-  description = "Name for the Infoblox-managed scope"
-  type        = string
-  default     = "infoblox-federated-scope"
-}
-
-variable "scope_description" {
-  description = "Description for the Infoblox-managed scope"
-  type        = string
-  default     = "Infoblox Federated IPAM Scope"
-}
-
-variable "operating_regions" {
-  description = "List of AWS regions where IPAM will operate"
-  type        = list(string)
-  default     = ["eu-west-1"]
-}
-
-variable "tags" {
-  description = "Common tags for all resources"
-  type        = map(string)
+###############################################################################
+# VPCs Configuration - Map for multiple VPCs
+###############################################################################
+variable "vpcs" {
+  description = "Map of VPCs to create"
+  type = map(object({
+    vpc_name        = string
+    vpc_cidr        = string
+    subnet_name     = string
+    subnet_cidr     = string
+    private_ip      = string
+    ec2_name        = string
+    enable_internet = bool
+    create_ec2      = bool
+  }))
   default = {
-    Purpose     = "infoblox-integration"
-    Environment = "lab"
-    ManagedBy   = "terraform"
+    "production" = {
+      vpc_name        = "Production-VPC"
+      vpc_cidr        = "10.100.0.0/16"
+      subnet_name     = "Production-Subnet"
+      subnet_cidr     = "10.100.1.0/24"
+      private_ip      = "10.100.1.10"
+      ec2_name        = "prod-server"
+      enable_internet = true
+      create_ec2      = true
+    }
+    "development" = {
+      vpc_name        = "Development-VPC"
+      vpc_cidr        = "10.200.0.0/16"
+      subnet_name     = "Development-Subnet"
+      subnet_cidr     = "10.200.1.0/24"
+      private_ip      = "10.200.1.10"
+      ec2_name        = "dev-server"
+      enable_internet = true
+      create_ec2      = true
+    }
   }
+}
+
+###############################################################################
+# IPAM Configuration
+###############################################################################
+variable "infoblox_resource_identifier" {
+  description = "Infoblox resource identifier for external authority (format: <version>.identity.account.<entity_realm>.<entity_id>). Leave empty to skip Infoblox authority config."
+  type        = string
+  default     = ""
 }

@@ -1,10 +1,9 @@
 ###############################################################################
-# AWS IPAM + Infoblox Integration - Main Configuration
+# AWS IPAM Lab - Main Configuration
 ###############################################################################
-# This Terraform configuration creates:
-# 1. AWS IPAM with Advanced tier (required for external authority)
-# 2. Custom private scope with Infoblox as external authority
-# 3. Top-level pool for CIDR provisioning from Infoblox
+# This creates:
+# 1. Base VPC infrastructure using module (VPC, Subnet, EC2, SG)
+# 2. AWS IPAM with Advanced tier (optional - for Infoblox integration)
 ###############################################################################
 
 terraform {
@@ -18,78 +17,99 @@ terraform {
   }
 }
 
+# Provider uses environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
 provider "aws" {
-  region  = var.aws_region
-  profile = var.aws_profile
+  region = var.aws_region
 }
 
 ###############################################################################
-# AWS IPAM - Advanced Tier
+# Local values
+###############################################################################
+locals {
+  common_tags = {
+    Environment   = "Lab"
+    Project       = "IPAM-UDDI"
+    ManagedBy     = "Terraform"
+    ResourceOwner = "lab-user"
+  }
+
+  user_data = file("${path.module}/../scripts/aws-user-data.sh")
+}
+
+###############################################################################
+# Base VPC Infrastructure - Using Module
+###############################################################################
+module "vpc" {
+  source   = "./modules/aws-vpc"
+  for_each = var.vpcs
+
+  vpc_name        = each.value.vpc_name
+  vpc_cidr        = each.value.vpc_cidr
+  subnet_name     = each.value.subnet_name
+  subnet_cidr     = each.value.subnet_cidr
+  private_ip      = each.value.private_ip
+  ec2_name        = each.value.ec2_name
+  enable_internet = each.value.enable_internet
+  create_ec2      = each.value.create_ec2
+  instance_type   = var.instance_type
+  user_data       = local.user_data
+
+  tags = merge(local.common_tags, {
+    VPC = each.key
+  })
+}
+
+###############################################################################
+# AWS IPAM - Advanced Tier (Required for Infoblox Integration)
 ###############################################################################
 resource "aws_vpc_ipam" "main" {
-  description = var.ipam_description
-  tier        = "advanced" # Required for external authority integration
+  description = "IPAM for Infoblox Integration"
+  tier        = "advanced"
 
   operating_regions {
     region_name = var.aws_region
   }
 
-  # Add additional operating regions if specified
-  dynamic "operating_regions" {
-    for_each = [for r in var.operating_regions : r if r != var.aws_region]
-    content {
-      region_name = operating_regions.value
-    }
-  }
-
-  tags = merge(var.tags, {
-    Name = var.ipam_name
+  tags = merge(local.common_tags, {
+    Name = "infoblox-ipam"
   })
 }
 
-###############################################################################
-# Custom Private Scope - Infoblox External Authority
-###############################################################################
+# Custom Private Scope for Infoblox
 resource "aws_vpc_ipam_scope" "infoblox" {
   ipam_id     = aws_vpc_ipam.main.id
-  description = var.scope_description
+  description = "Scope managed by Infoblox UDDI"
 
-  tags = merge(var.tags, {
-    Name = var.scope_name
+  tags = merge(local.common_tags, {
+    Name = "infoblox-scope"
   })
 }
 
-###############################################################################
-# Configure Infoblox as External Authority
-# Note: This uses a null_resource with local-exec because Terraform AWS
-# provider doesn't yet support external_authority_configuration natively
-###############################################################################
+# Configure Infoblox as External Authority (only if identifier provided)
 resource "null_resource" "configure_infoblox_authority" {
+  count = var.infoblox_resource_identifier != "" ? 1 : 0
+
   depends_on = [aws_vpc_ipam_scope.infoblox]
 
   triggers = {
     scope_id                     = aws_vpc_ipam_scope.infoblox.id
     infoblox_resource_identifier = var.infoblox_resource_identifier
-    aws_profile                  = var.aws_profile
     aws_region                   = var.aws_region
   }
 
   provisioner "local-exec" {
     command = <<-EOT
       aws ec2 modify-ipam-scope \
-        --profile ${var.aws_profile} \
         --region ${var.aws_region} \
         --ipam-scope-id ${aws_vpc_ipam_scope.infoblox.id} \
         --external-authority-configuration Type=infoblox,ExternalResourceIdentifier=${var.infoblox_resource_identifier}
     EOT
   }
 
-  # Remove external authority on destroy
   provisioner "local-exec" {
     when    = destroy
     command = <<-EOT
       aws ec2 modify-ipam-scope \
-        --profile ${self.triggers.aws_profile} \
         --region ${self.triggers.aws_region} \
         --ipam-scope-id ${self.triggers.scope_id} \
         --remove-external-authority-configuration 2>/dev/null || true
@@ -97,27 +117,23 @@ resource "null_resource" "configure_infoblox_authority" {
   }
 }
 
-###############################################################################
-# Top-Level Pool in Infoblox-Managed Scope
-# Note: Pool starts empty - CIDRs are provisioned from Infoblox
-###############################################################################
+# IPAM Pool in Infoblox-Managed Scope
 resource "aws_vpc_ipam_pool" "infoblox_managed" {
-  depends_on = [null_resource.configure_infoblox_authority]
+  depends_on = [aws_vpc_ipam_scope.infoblox]
 
   ipam_scope_id  = aws_vpc_ipam_scope.infoblox.id
   address_family = "ipv4"
-  description    = "Pool managed by Infoblox - CIDR sourced from Infoblox UDDI"
+  description    = "Pool managed by Infoblox UDDI"
   locale         = var.aws_region
 
-  tags = merge(var.tags, {
+  tags = merge(local.common_tags, {
     Name   = "infoblox-managed-pool"
     Source = "infoblox-uddi"
   })
 }
 
 ###############################################################################
-# Data source for account ID (useful for IAM role setup)
+# Data sources
 ###############################################################################
 data "aws_caller_identity" "current" {}
-
 data "aws_region" "current" {}

@@ -48,6 +48,21 @@ output "infoblox_resource_identifier" {
 }
 
 ###############################################################################
+# VPC Outputs
+###############################################################################
+output "vpcs" {
+  description = "Map of VPC outputs"
+  value = {
+    for k, v in module.vpc : k => {
+      vpc_id    = v.vpc_id
+      vpc_cidr  = v.vpc_cidr
+      subnet_id = v.subnet_id
+      public_ip = v.public_ip
+    }
+  }
+}
+
+###############################################################################
 # Summary Output for Quick Reference
 ###############################################################################
 output "summary" {
@@ -59,14 +74,15 @@ output "summary" {
       tier   = "advanced"
     }
     scope = {
-      id                = aws_vpc_ipam_scope.infoblox.id
-      external_authority = "infoblox"
-      resource_id       = var.infoblox_resource_identifier
+      id                 = aws_vpc_ipam_scope.infoblox.id
+      external_authority = var.infoblox_resource_identifier != "" ? "infoblox" : "none"
+      resource_id        = var.infoblox_resource_identifier
     }
     pool = {
       id     = aws_vpc_ipam_pool.infoblox_managed.id
       locale = var.aws_region
       note   = "CIDRs provisioned from Infoblox"
     }
+    vpcs = keys(module.vpc)
   }
 }
