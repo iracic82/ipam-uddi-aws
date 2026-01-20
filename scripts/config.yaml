@@ -1,0 +1,69 @@
+# Federated IPAM Lab Configuration
+# AWS IPAM + Infoblox Integration
+
+base_url: "https://csp.infoblox.com"
+email: "${INFOBLOX_EMAIL}"
+password: "${INFOBLOX_PASSWORD}"
+sandbox_id_file: "sandbox_id.txt"
+
+# Federated Realm for the lab
+realm:
+  name: "ACME Corporation"
+  comment: "Federated IPAM Lab - AWS IPAM Integration"
+  tags:
+    owner: "instruqt"
+    env: "lab"
+    purpose: "aws-ipam-integration"
+
+# Federated blocks representing different environments
+blocks:
+  # AWS block - will be managed via AWS IPAM integration
+  - name: "AWS-Cloud"
+    address: "10.100.0.0"
+    cidr: 16
+    comment: "AWS Cloud Infrastructure - Managed via AWS IPAM"
+    tags:
+      env: "lab"
+      owner: "instruqt"
+      provider: "aws"
+
+  # On-premises blocks for overlap detection demo
+  - name: "DataCenter-EU"
+    address: "10.20.0.0"
+    cidr: 16
+    comment: "European Data Center - On-premises"
+    tags:
+      env: "lab"
+      owner: "instruqt"
+      provider: "on-prem"
+      location: "eu"
+
+  - name: "DataCenter-US"
+    address: "192.168.0.0"
+    cidr: 16
+    comment: "US Data Center - On-premises"
+    tags:
+      env: "lab"
+      owner: "instruqt"
+      provider: "on-prem"
+      location: "us"
+
+  # Intentional overlap for demo (same as part of AWS block)
+  - name: "Legacy-Network"
+    address: "10.100.50.0"
+    cidr: 24
+    comment: "Legacy network - INTENTIONAL OVERLAP for demo"
+    tags:
+      env: "lab"
+      owner: "instruqt"
+      overlap: "true"
+
+# AWS IPAM Configuration
+aws_ipam:
+  region: "eu-west-1"
+  tier: "advanced"
+  scope_name: "infoblox-federated-scope"
+  scope_description: "Infoblox Federated IPAM Scope"
+  pool_name: "infoblox-managed-pool"
+  # This will be populated dynamically from Infoblox
+  infoblox_resource_identifier: "${INFOBLOX_RESOURCE_IDENTIFIER}"

@@ -1,0 +1,23 @@
+# AWS IPAM + Infoblox Integration - Example Variables
+# Copy this file to terraform.tfvars and customize
+
+aws_region  = "eu-west-1"
+aws_profile = "okta-sso"
+
+ipam_name        = "federated-ipam-lab"
+ipam_description = "Federated IPAM Lab - Infoblox Integration"
+
+# Get this from Infoblox CSP Portal
+# Format: <version>.identity.account.<entity_realm>.<entity_id>
+infoblox_resource_identifier = "blox0.identity.account.us-com-1.your-entity-id"
+
+scope_name        = "infoblox-federated-scope"
+scope_description = "Infoblox Federated IPAM Scope"
+
+operating_regions = ["eu-west-1"]
+
+tags = {
+  Purpose     = "infoblox-integration"
+  Environment = "lab"
+  ManagedBy   = "terraform"
+}
