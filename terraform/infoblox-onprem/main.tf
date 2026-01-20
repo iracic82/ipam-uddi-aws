@@ -102,9 +102,11 @@ resource "bloxone_ipam_address_block" "onprem_mgmt" {
 }
 
 ###############################################################################
-# On-Prem Subnets
+# On-Prem Subnets - Must be created AFTER address blocks
 ###############################################################################
 resource "bloxone_ipam_subnet" "onprem_servers_subnet" {
+  depends_on = [bloxone_ipam_address_block.onprem_servers]
+
   address = "192.168.1.0"
   cidr    = 26
   space   = bloxone_ipam_ip_space.onprem.id
@@ -117,6 +119,8 @@ resource "bloxone_ipam_subnet" "onprem_servers_subnet" {
 }
 
 resource "bloxone_ipam_subnet" "onprem_workstations_subnet" {
+  depends_on = [bloxone_ipam_address_block.onprem_workstations]
+
   address = "192.168.10.0"
   cidr    = 26
   space   = bloxone_ipam_ip_space.onprem.id
