@@ -17,18 +17,28 @@ realm:
 
 # Federated blocks representing different environments
 blocks:
-  # AWS Cloud - Top-level block
-  - name: "AWS"
-    address: "10.0.0.0"
-    cidr: 8
-    comment: "AWS Cloud IP Space"
+  # AWS Cloud - Production
+  - name: "AWS-Production"
+    address: "10.100.0.0"
+    cidr: 16
+    comment: "AWS Production Environment"
     tags:
-      env: "cloud"
+      env: "production"
+      owner: "instruqt"
+      provider: "aws"
+
+  # AWS Cloud - Development
+  - name: "AWS-Development"
+    address: "10.200.0.0"
+    cidr: 16
+    comment: "AWS Development Environment"
+    tags:
+      env: "development"
       owner: "instruqt"
       provider: "aws"
 
   # On-Prem DataCenter - Clean space
-  - name: "On-Prem"
+  - name: "On-Prem-DC"
     address: "192.168.0.0"
     cidr: 16
     comment: "On-Prem DataCenter Network"
@@ -37,7 +47,7 @@ blocks:
       owner: "instruqt"
       provider: "datacenter"
 
-  # On-Prem Legacy - INTENTIONALLY OVERLAPS with AWS
+  # On-Prem Legacy - SAME RANGE as AWS-Production = TRUE OVERLAP
   - name: "On-Prem-Legacy"
     address: "10.100.0.0"
     cidr: 16
