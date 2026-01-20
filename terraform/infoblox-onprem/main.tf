@@ -17,6 +17,10 @@ terraform {
 provider "bloxone" {
   csp_url = "https://csp.infoblox.com"
   api_key = var.ddi_api_key
+
+  default_tags = {
+    managed_by = "terraform"
+  }
 }
 
 ###############################################################################
@@ -28,9 +32,19 @@ variable "ddi_api_key" {
   sensitive   = true
 }
 
-variable "realm_id" {
-  description = "Federated realm ID from federation_output.json"
-  type        = string
+###############################################################################
+# Lookup Realm and Federated Block via Data Sources
+###############################################################################
+data "bloxone_federation_federated_realms" "acme" {
+  filters = {
+    name = "ACME Corporation"
+  }
+}
+
+data "bloxone_federation_federated_blocks" "onprem_block" {
+  filters = {
+    name = "On-Prem"
+  }
 }
 
 ###############################################################################
@@ -40,12 +54,11 @@ resource "bloxone_ipam_ip_space" "onprem" {
   name    = "On-Premises-DataCenter"
   comment = "On-premises datacenter IP space"
 
-  default_realms = [var.realm_id]
+  default_realms = [data.bloxone_federation_federated_realms.acme.results[0].id]
 
   tags = {
     environment = "on-prem"
     location    = "datacenter"
-    managed_by  = "terraform"
   }
 }
 
@@ -61,7 +74,7 @@ resource "bloxone_ipam_address_block" "onprem_servers" {
   space   = bloxone_ipam_ip_space.onprem.id
   comment = "On-prem server network"
 
-  federated_realms = [var.realm_id]
+  federated_realms = [data.bloxone_federation_federated_realms.acme.results[0].id]
 
   tags = {
     environment = "on-prem"
@@ -77,7 +90,7 @@ resource "bloxone_ipam_address_block" "onprem_workstations" {
   space   = bloxone_ipam_ip_space.onprem.id
   comment = "On-prem workstation network"
 
-  federated_realms = [var.realm_id]
+  federated_realms = [data.bloxone_federation_federated_realms.acme.results[0].id]
 
   tags = {
     environment = "on-prem"
@@ -93,7 +106,7 @@ resource "bloxone_ipam_address_block" "onprem_mgmt" {
   space   = bloxone_ipam_ip_space.onprem.id
   comment = "On-prem management network"
 
-  federated_realms = [var.realm_id]
+  federated_realms = [data.bloxone_federation_federated_realms.acme.results[0].id]
 
   tags = {
     environment = "on-prem"
@@ -135,6 +148,11 @@ resource "bloxone_ipam_subnet" "onprem_workstations_subnet" {
 ###############################################################################
 # Outputs
 ###############################################################################
+output "realm_id" {
+  description = "Federated realm ID"
+  value       = data.bloxone_federation_federated_realms.acme.results[0].id
+}
+
 output "ip_space_id" {
   description = "On-prem IP space ID"
   value       = bloxone_ipam_ip_space.onprem.id
