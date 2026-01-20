@@ -17,25 +17,36 @@ realm:
 
 # Federated blocks representing different environments
 blocks:
-  # Production environment
-  - name: "Production"
-    address: "10.100.0.0"
-    cidr: 16
-    comment: "Production Environment - AWS"
+  # AWS Cloud - Top-level block
+  - name: "AWS"
+    address: "10.0.0.0"
+    cidr: 8
+    comment: "AWS Cloud IP Space"
     tags:
-      env: "production"
+      env: "cloud"
       owner: "instruqt"
       provider: "aws"
 
-  # Development environment
-  - name: "Development"
-    address: "10.200.0.0"
+  # On-Prem DataCenter - Clean space
+  - name: "On-Prem"
+    address: "192.168.0.0"
     cidr: 16
-    comment: "Development Environment - AWS"
+    comment: "On-Prem DataCenter Network"
     tags:
-      env: "development"
+      env: "on-prem"
       owner: "instruqt"
-      provider: "aws"
+      provider: "datacenter"
+
+  # On-Prem Legacy - INTENTIONALLY OVERLAPS with AWS
+  - name: "On-Prem-Legacy"
+    address: "10.100.0.0"
+    cidr: 16
+    comment: "Legacy DC Network - OVERLAPS with AWS Production"
+    tags:
+      env: "on-prem"
+      owner: "instruqt"
+      provider: "datacenter"
+      overlap: "intentional-demo"
 
 # AWS IPAM Configuration
 aws_ipam:
@@ -44,5 +55,4 @@ aws_ipam:
   scope_name: "infoblox-federated-scope"
   scope_description: "Infoblox Federated IPAM Scope"
   pool_name: "infoblox-managed-pool"
-  # This will be populated dynamically from Infoblox
   infoblox_resource_identifier: "${INFOBLOX_RESOURCE_IDENTIFIER}"
