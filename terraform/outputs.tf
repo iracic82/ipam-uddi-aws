@@ -4,12 +4,12 @@
 
 output "ipam_id" {
   description = "The ID of the AWS IPAM"
-  value       = aws_vpc_ipam.main.id
+  value       = local.ipam_id
 }
 
 output "ipam_arn" {
   description = "The ARN of the AWS IPAM"
-  value       = aws_vpc_ipam.main.arn
+  value       = local.create_ipam ? aws_vpc_ipam.main[0].arn : "existing-ipam"
 }
 
 output "ipam_region" {
@@ -54,7 +54,7 @@ output "aws_account_id" {
 
 output "infoblox_resource_identifier" {
   description = "The Infoblox resource identifier used for external authority"
-  value       = var.infoblox_resource_identifier
+  value       = local.infoblox_resource_identifier
 }
 
 ###############################################################################
@@ -79,14 +79,14 @@ output "summary" {
   description = "Summary of created resources"
   value = {
     ipam = {
-      id     = aws_vpc_ipam.main.id
+      id     = local.ipam_id
       region = var.aws_region
       tier   = "advanced"
     }
     scope = {
       id                 = aws_vpc_ipam_scope.infoblox.id
-      external_authority = var.infoblox_resource_identifier != "" ? "infoblox" : "none"
-      resource_id        = var.infoblox_resource_identifier
+      external_authority = local.infoblox_resource_identifier != "" ? "infoblox" : "none"
+      resource_id        = local.infoblox_resource_identifier
     }
     pools = {
       production = {
