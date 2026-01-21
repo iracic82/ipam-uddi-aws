@@ -24,6 +24,13 @@ variable "aws_region" {
 variable "external_id" {
   description = "External ID from Infoblox (account UUID from get_infoblox_identity.py)"
   type        = string
+  default     = ""
+}
+
+variable "identity_file" {
+  description = "Path to identity_output.json from get_infoblox_identity.py"
+  type        = string
+  default     = "../../scripts/identity_output.json"
 }
 
 variable "role_name" {
@@ -34,6 +41,9 @@ variable "role_name" {
 
 locals {
   infoblox_aws_account_id = "418668170506"
+  # Read from file if external_id not provided
+  identity_data = var.external_id != "" ? null : jsondecode(file(var.identity_file))
+  external_id   = var.external_id != "" ? var.external_id : local.identity_data.external_id
 }
 
 ###############################################################################
@@ -53,7 +63,7 @@ resource "aws_iam_role" "infoblox_discovery" {
         Action = "sts:AssumeRole"
         Condition = {
           StringEquals = {
-            "sts:ExternalId" = var.external_id
+            "sts:ExternalId" = local.external_id
           }
         }
       }
