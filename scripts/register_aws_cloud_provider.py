@@ -13,12 +13,17 @@ if not TOKEN:
     raise EnvironmentError("❌ 'Infoblox_Token' environment variable is not set.")
 if not PARTICIPANT_ID:
     raise EnvironmentError("❌ 'INSTRUQT_PARTICIPANT_ID' environment variable is not set.")
-if not os.path.isfile(ROLE_ARN_FILE):
-    raise FileNotFoundError(f"❌ IAM Role ARN file not found: {ROLE_ARN_FILE}")
 
-# === Load Role ARN from file ===
-with open(ROLE_ARN_FILE, "r") as f:
-    role_arn = f.read().strip()
+# === Get Role ARN (from file or construct from env var) ===
+AWS_ACCOUNT_ID = os.environ.get("INSTRUQT_AWS_ACCOUNT_INFOBLOX_DEMO_ACCOUNT_ID")
+
+if os.path.isfile(ROLE_ARN_FILE):
+    with open(ROLE_ARN_FILE, "r") as f:
+        role_arn = f.read().strip()
+elif AWS_ACCOUNT_ID:
+    role_arn = f"arn:aws:iam::{AWS_ACCOUNT_ID}:role/infoblox_discovery"
+else:
+    raise EnvironmentError("❌ No role ARN available. Create infoblox_role_arn.txt or set INSTRUQT_AWS_ACCOUNT_INFOBLOX_DEMO_ACCOUNT_ID")
 
 print(f"🔐 Using IAM Role ARN: {role_arn}")
 print(f"👤 Participant ID: {PARTICIPANT_ID}")
