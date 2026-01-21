@@ -36,7 +36,13 @@ variable "identity_file" {
 variable "role_name" {
   description = "Name of the IAM role"
   type        = string
-  default     = "InfobloxDiscoveryRole"
+  default     = "infoblox_discovery"
+}
+
+variable "aws_account_id" {
+  description = "AWS Account ID (from env INSTRUQT_AWS_ACCOUNT_INFOBLOX_DEMO_ACCOUNT_ID)"
+  type        = string
+  default     = ""  # Will use data source if not provided
 }
 
 locals {

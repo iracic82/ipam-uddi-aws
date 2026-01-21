@@ -158,12 +158,33 @@ class DiscoveryJobCreator:
         return jobs
 
 
+def get_role_arn(args):
+    """Get role ARN from args, file, or construct from env var"""
+    # 1. From command line
+    if args.role_arn:
+        return args.role_arn
+
+    # 2. From file
+    role_arn_file = args.role_arn_file
+    if os.path.exists(role_arn_file):
+        with open(role_arn_file, "r") as f:
+            return f.read().strip()
+
+    # 3. Construct from env var
+    aws_account_id = os.environ.get("INSTRUQT_AWS_ACCOUNT_INFOBLOX_DEMO_ACCOUNT_ID")
+    if aws_account_id:
+        return f"arn:aws:iam::{aws_account_id}:role/infoblox_discovery"
+
+    raise ValueError("No role ARN provided. Use --role-arn, create infoblox_role_arn.txt, or set INSTRUQT_AWS_ACCOUNT_INFOBLOX_DEMO_ACCOUNT_ID")
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Create AWS Discovery Job using IAM Role")
     parser.add_argument("--config", default="config.yaml", help="Config file path")
-    parser.add_argument("--role-arn", required=True, help="AWS IAM Role ARN for Infoblox to assume")
+    parser.add_argument("--role-arn", help="AWS IAM Role ARN for Infoblox to assume")
+    parser.add_argument("--role-arn-file", default="infoblox_role_arn.txt", help="File containing role ARN")
     parser.add_argument("--regions", default="eu-west-1", help="Comma-separated AWS regions (default: eu-west-1)")
     parser.add_argument("--name", default="AWS-Discovery-IAM", help="Discovery job name")
     parser.add_argument("--sandbox", action="store_true", help="Switch to sandbox account")
@@ -184,9 +205,10 @@ if __name__ == "__main__":
         print(f"\n  {external_id}\n")
         print("="*60)
     else:
+        role_arn = get_role_arn(args)
         regions = [r.strip() for r in args.regions.split(",")]
         creator.create_discovery_job(
-            role_arn=args.role_arn,
+            role_arn=role_arn,
             regions=regions,
             job_name=args.name
         )
