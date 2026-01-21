@@ -2,9 +2,10 @@
 # Challenge 4: Deploy AWS VPC with Infoblox IP Allocation
 ###############################################################################
 # This terraform:
-# 1. Looks up ACME Corporation realm and APPS block in Infoblox
-# 2. Allocates next-available subnet from APPS block
-# 3. Creates AWS VPC and networking using that allocation
+# 1. Looks up ACME Corporation realm
+# 2. Creates an IP Space and Address Block in Infoblox
+# 3. Allocates next-available subnet from the block
+# 4. Creates AWS VPC and networking using that allocation
 ###############################################################################
 
 terraform {
@@ -61,8 +62,14 @@ variable "vpc_name" {
   default     = "Apps-VPC"
 }
 
+variable "apps_block_cidr" {
+  description = "CIDR for the APPS address block"
+  type        = string
+  default     = "10.40.0.0/24"
+}
+
 ###############################################################################
-# Lookup Infoblox Resources
+# Lookup Infoblox Federated Realm
 ###############################################################################
 data "bloxone_federation_federated_realms" "acme" {
   filters = {
@@ -70,27 +77,53 @@ data "bloxone_federation_federated_realms" "acme" {
   }
 }
 
-# Lookup the APPS address block by name
-data "bloxone_ipam_address_blocks" "apps" {
-  filters = {
-    name = "APPS"
+###############################################################################
+# Create Infoblox IP Space for Apps
+###############################################################################
+resource "bloxone_ipam_ip_space" "apps" {
+  name    = "Apps-IP-Space"
+  comment = "IP Space for Apps VPCs - Challenge 4"
+
+  default_realms = [data.bloxone_federation_federated_realms.acme.results[0].id]
+
+  tags = {
+    environment = "apps"
+    purpose     = "vpc-allocation"
   }
 }
 
 ###############################################################################
-# Allocate Next Available Subnet from APPS Block
+# Create Address Block in the IP Space
+###############################################################################
+resource "bloxone_ipam_address_block" "apps" {
+  address = split("/", var.apps_block_cidr)[0]
+  cidr    = tonumber(split("/", var.apps_block_cidr)[1])
+  name    = "Apps-Block"
+  space   = bloxone_ipam_ip_space.apps.id
+  comment = "Address block for Apps VPCs"
+
+  federated_realms = [data.bloxone_federation_federated_realms.acme.results[0].id]
+
+  tags = {
+    environment = "apps"
+    origin      = "terraform"
+  }
+}
+
+###############################################################################
+# Allocate Next Available Subnet from Apps Block
 ###############################################################################
 resource "bloxone_ipam_subnet" "apps_vpc_subnet" {
-  next_available_id = data.bloxone_ipam_address_blocks.apps.results[0].id
+  next_available_id = bloxone_ipam_address_block.apps.id
   cidr              = 26
-  space             = data.bloxone_ipam_address_blocks.apps.results[0].space
+  space             = bloxone_ipam_ip_space.apps.id
   name              = "${var.vpc_name}-Subnet"
   comment           = "Allocated for ${var.vpc_name} via Challenge 4 automation"
 
   tags = {
-    environment  = "apps"
-    provisioned  = "terraform"
-    challenge    = "04"
+    environment = "apps"
+    provisioned = "terraform"
+    challenge   = "04"
   }
 }
 
@@ -199,8 +232,18 @@ resource "aws_security_group" "apps" {
 ###############################################################################
 # Outputs
 ###############################################################################
+output "infoblox_ip_space" {
+  description = "Infoblox IP Space created"
+  value       = bloxone_ipam_ip_space.apps.name
+}
+
+output "infoblox_address_block" {
+  description = "Infoblox Address Block created"
+  value       = "${bloxone_ipam_address_block.apps.address}/${bloxone_ipam_address_block.apps.cidr}"
+}
+
 output "infoblox_allocated_cidr" {
-  description = "CIDR allocated from Infoblox APPS block"
+  description = "CIDR allocated from Infoblox"
   value       = "${bloxone_ipam_subnet.apps_vpc_subnet.address}/${bloxone_ipam_subnet.apps_vpc_subnet.cidr}"
 }
 
@@ -222,11 +265,13 @@ output "subnet_id" {
 output "summary" {
   description = "Deployment summary"
   value = {
-    infoblox_allocation = "${bloxone_ipam_subnet.apps_vpc_subnet.address}/${bloxone_ipam_subnet.apps_vpc_subnet.cidr}"
-    aws_vpc_id          = aws_vpc.apps.id
-    aws_vpc_cidr        = aws_vpc.apps.cidr_block
-    aws_subnet_id       = aws_subnet.apps.id
-    aws_region          = var.aws_region
-    message             = "VPC created with IP-safe allocation from Infoblox!"
+    infoblox_ip_space       = bloxone_ipam_ip_space.apps.name
+    infoblox_address_block  = "${bloxone_ipam_address_block.apps.address}/${bloxone_ipam_address_block.apps.cidr}"
+    infoblox_allocation     = "${bloxone_ipam_subnet.apps_vpc_subnet.address}/${bloxone_ipam_subnet.apps_vpc_subnet.cidr}"
+    aws_vpc_id              = aws_vpc.apps.id
+    aws_vpc_cidr            = aws_vpc.apps.cidr_block
+    aws_subnet_id           = aws_subnet.apps.id
+    aws_region              = var.aws_region
+    message                 = "VPC created with IP-safe allocation from Infoblox!"
   }
 }
