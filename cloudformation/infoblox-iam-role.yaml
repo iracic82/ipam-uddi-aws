@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: IAM Role for Infoblox Discovery with AdministratorAccess
+
+Parameters:
+  ExternalId:
+    Type: String
+    Description: External ID from Infoblox (get_infoblox_identity.py)
+
+  AccountId:
+    Type: String
+    Description: Infoblox AWS account ID
+    Default: "902917483333"
+
+  RoleName:
+    Type: String
+    Description: Name of the IAM role
+    Default: "infoblox_discovery"
+
+Resources:
+  InfobloxDiscoveryRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: !Ref RoleName
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AccountId}:root"
+            Action: "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                "sts:ExternalId": !Ref ExternalId
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AdministratorAccess"
+      Tags:
+        - Key: "CreatedBy"
+          Value: "CloudFormation"
+        - Key: "Purpose"
+          Value: "Infoblox Discovery"
+
+Outputs:
+  RoleARN:
+    Description: "ARN of the IAM role"
+    Value: !GetAtt InfobloxDiscoveryRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-RoleARN"

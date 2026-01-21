@@ -40,7 +40,7 @@ variable "role_name" {
 }
 
 locals {
-  infoblox_aws_account_id = "418668170506"
+  infoblox_aws_account_id = "902917483333"
   # Read from file if external_id not provided
   identity_data = var.external_id != "" ? null : jsondecode(file(var.identity_file))
   external_id   = var.external_id != "" ? var.external_id : local.identity_data.external_id
