@@ -195,7 +195,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Register AWS Cloud Provider with Infoblox")
     parser.add_argument("--config", default="config.yaml", help="Config file path")
     parser.add_argument("--role-arn-file", default="infoblox_role_arn.txt", help="File containing role ARN")
-    parser.add_argument("--name", default="AWS-Discovery", help="Provider name")
+    parser.add_argument("--name", default="AWS_Discovery", help="Provider name (alphanumeric and underscores only)")
     parser.add_argument("--sandbox", action="store_true", help="Switch to sandbox account")
     args = parser.parse_args()
 
