@@ -112,7 +112,11 @@ class BlockPoolAssigner:
         print(f"   Pool ID: {pool_id}")
 
         r = requests.patch(url, headers=self.headers, json=payload)
-        r.raise_for_status()
+
+        if not r.ok:
+            print(f"❌ Error: {r.status_code}")
+            print(f"   Response: {r.text}")
+            r.raise_for_status()
 
         result = r.json().get("result", {})
         print(f"✅ Successfully assigned pool to block '{block.get('name')}'")
