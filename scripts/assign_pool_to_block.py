@@ -98,12 +98,8 @@ class BlockPoolAssigner:
 
         url = f"{self.base_url}/api/ddi/v1/federation/federated_block/{block_uuid}"
 
+        # Try minimal payload - just the pool assignment
         payload = {
-            "cidr": block.get("cidr"),
-            "name": block.get("name"),
-            "comment": block.get("comment", ""),
-            "federated_realm": block.get("federated_realm"),
-            "tags": block.get("tags", {}),
             "federated_pool_id": pool_id
         }
 
