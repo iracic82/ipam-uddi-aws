@@ -83,8 +83,8 @@ class InfobloxIdentity:
 
         identity = {
             "blox_id": user.get("account_infoblox_id"),
-            "external_id": user.get("id"),
-            "account_id": user.get("account_id"),
+            "external_id": user.get("account_id"),  # account_id for AWS IAM trust
+            "user_id": user.get("id"),
             "account_csp_id": user.get("account_csp_id"),
             "csp_id": user.get("csp_id")
         }
