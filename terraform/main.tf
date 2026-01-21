@@ -34,6 +34,14 @@ locals {
   }
 
   user_data = file("${path.module}/../scripts/aws-user-data.sh")
+
+  # Read blox_id from identity_output.json if not provided via variable
+  identity_data = var.infoblox_resource_identifier != "" ? null : (
+    fileexists(var.identity_file) ? jsondecode(file(var.identity_file)) : null
+  )
+  infoblox_resource_identifier = var.infoblox_resource_identifier != "" ? var.infoblox_resource_identifier : (
+    local.identity_data != null ? local.identity_data.blox_id : ""
+  )
 }
 
 ###############################################################################
@@ -87,13 +95,13 @@ resource "aws_vpc_ipam_scope" "infoblox" {
 
 # Configure Infoblox as External Authority (only if identifier provided)
 resource "null_resource" "configure_infoblox_authority" {
-  count = var.infoblox_resource_identifier != "" ? 1 : 0
+  count = local.infoblox_resource_identifier != "" ? 1 : 0
 
   depends_on = [aws_vpc_ipam_scope.infoblox]
 
   triggers = {
     scope_id                     = aws_vpc_ipam_scope.infoblox.id
-    infoblox_resource_identifier = var.infoblox_resource_identifier
+    infoblox_resource_identifier = local.infoblox_resource_identifier
     aws_region                   = var.aws_region
   }
 
@@ -102,7 +110,7 @@ resource "null_resource" "configure_infoblox_authority" {
       aws ec2 modify-ipam-scope \
         --region ${var.aws_region} \
         --ipam-scope-id ${aws_vpc_ipam_scope.infoblox.id} \
-        --external-authority-configuration Type=infoblox,ExternalResourceIdentifier=${var.infoblox_resource_identifier}
+        --external-authority-configuration Type=infoblox,ExternalResourceIdentifier=${local.infoblox_resource_identifier}
     EOT
   }
 

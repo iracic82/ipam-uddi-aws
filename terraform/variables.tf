@@ -57,7 +57,13 @@ variable "vpcs" {
 # IPAM Configuration
 ###############################################################################
 variable "infoblox_resource_identifier" {
-  description = "Infoblox resource identifier for external authority (format: <version>.identity.account.<entity_realm>.<entity_id>). Leave empty to skip Infoblox authority config."
+  description = "Infoblox resource identifier for external authority (blox_id). If empty, reads from identity_file."
   type        = string
   default     = ""
+}
+
+variable "identity_file" {
+  description = "Path to identity_output.json from get_infoblox_identity.py"
+  type        = string
+  default     = "../scripts/identity_output.json"
 }
