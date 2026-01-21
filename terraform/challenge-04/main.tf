@@ -70,18 +70,10 @@ data "bloxone_federation_federated_realms" "acme" {
   }
 }
 
-# Lookup the IP Space that contains the APPS block
-data "bloxone_ipam_ip_spaces" "aws" {
-  filters = {
-    name = "AWS"
-  }
-}
-
-# Lookup the APPS address block
+# Lookup the APPS address block by name
 data "bloxone_ipam_address_blocks" "apps" {
   filters = {
-    address = "10.40.0.0"
-    cidr    = "24"
+    name = "APPS"
   }
 }
 
@@ -91,7 +83,7 @@ data "bloxone_ipam_address_blocks" "apps" {
 resource "bloxone_ipam_subnet" "apps_vpc_subnet" {
   next_available_id = data.bloxone_ipam_address_blocks.apps.results[0].id
   cidr              = 26
-  space             = data.bloxone_ipam_ip_spaces.aws.results[0].id
+  space             = data.bloxone_ipam_address_blocks.apps.results[0].space
   name              = "${var.vpc_name}-Subnet"
   comment           = "Allocated for ${var.vpc_name} via Challenge 4 automation"
 
