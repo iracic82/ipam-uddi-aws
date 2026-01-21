@@ -78,12 +78,27 @@ class AWSCloudProviderRegistrar:
 
         raise EnvironmentError("No role ARN. Create infoblox_role_arn.txt or set INSTRUQT_AWS_ACCOUNT_INFOBLOX_DEMO_ACCOUNT_ID")
 
-    def register_provider(self, role_arn, provider_name, view_name=None):
+    def get_realm_id(self, output_file="federation_output.json"):
+        """Read realm ID from federation_output.json"""
+        if os.path.exists(output_file):
+            with open(output_file, "r") as f:
+                data = json.load(f)
+            realm_id = data.get("realm", {}).get("id")
+            if realm_id:
+                print(f"Found realm ID: {realm_id}")
+                return realm_id
+        print("No realm ID found in federation_output.json")
+        return None
+
+    def register_provider(self, role_arn, provider_name, realm_id=None, view_name=None):
         """Register AWS cloud provider with Infoblox"""
         url = f"{self.base_url}/api/cloud_discovery/v2/providers"
 
         if not view_name:
             view_name = f"{provider_name}_view"
+
+        # Extract AWS account ID from role ARN
+        aws_account_id = role_arn.split(":")[4] if role_arn else None
 
         payload = {
             "name": provider_name,
@@ -95,18 +110,19 @@ class AWSCloudProviderRegistrar:
                 "credential_type": "dynamic",
                 "access_identifier_type": "role_arn"
             },
-            "destination_types_enabled": ["DNS"],
+            "destination_types_enabled": ["DNS", "IPAM/DHCP"],
             "source_configs": [
                 {
                     "credential_config": {
                         "access_identifier": role_arn
-                    }
+                    },
+                    "restricted_to_accounts": [aws_account_id] if aws_account_id else []
                 }
             ],
             "additional_config": {
                 "excluded_accounts": [],
                 "forward_zone_enabled": False,
-                "internal_ranges_enabled": False,
+                "federated_realms": [realm_id] if realm_id else [],
                 "object_type": {
                     "version": 1,
                     "discover_new": True,
@@ -168,6 +184,14 @@ class AWSCloudProviderRegistrar:
                             "resolver_endpoints_sync_enabled": False
                         }
                     }
+                },
+                {
+                    "destination_type": "IPAM/DHCP",
+                    "config": {
+                        "ipam": {
+                            "disable_ipam_projection": False
+                        }
+                    }
                 }
             ]
         }
@@ -206,4 +230,5 @@ if __name__ == "__main__":
         registrar.switch_account()
 
     role_arn = registrar.get_role_arn(args.role_arn_file)
-    registrar.register_provider(role_arn, args.name)
+    realm_id = registrar.get_realm_id()
+    registrar.register_provider(role_arn, args.name, realm_id=realm_id)
