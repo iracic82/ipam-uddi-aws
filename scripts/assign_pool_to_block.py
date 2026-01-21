@@ -91,15 +91,20 @@ class BlockPoolAssigner:
         return pool_id
 
     def assign_pool_to_block(self, block, pool_id):
-        """PATCH the federated block to assign the pool"""
+        """PATCH the federated block to assign the pool - requires full block payload"""
         block_id = block.get("id")
         # Extract just the UUID from the full ID path
         block_uuid = block_id.split("/")[-1]
 
         url = f"{self.base_url}/api/ddi/v1/federation/federated_block/{block_uuid}"
 
-        # Try minimal payload - just the pool assignment
+        # PATCH requires full block payload with federated_pool_id added
         payload = {
+            "cidr": block.get("cidr"),
+            "name": block.get("name"),
+            "comment": block.get("comment", ""),
+            "federated_realm": block.get("federated_realm"),
+            "tags": block.get("tags", {}),
             "federated_pool_id": pool_id
         }
 
