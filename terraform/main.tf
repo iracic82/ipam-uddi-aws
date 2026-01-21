@@ -75,7 +75,7 @@ data "aws_vpc_ipams" "existing" {}
 
 locals {
   # Use existing IPAM if available, otherwise create new one
-  existing_ipam_id = length(data.aws_vpc_ipams.existing.ipams) > 0 ? data.aws_vpc_ipams.existing.ipams[0].ipam_id : null
+  existing_ipam_id = length(data.aws_vpc_ipams.existing.ipams) > 0 ? data.aws_vpc_ipams.existing.ipams[0].id : null
   create_ipam      = local.existing_ipam_id == null
   ipam_id          = local.create_ipam ? aws_vpc_ipam.main[0].id : local.existing_ipam_id
 }
