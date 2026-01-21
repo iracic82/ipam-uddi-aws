@@ -81,9 +81,13 @@ class InfobloxIdentity:
         """Extract AWS integration relevant identity info"""
         user = self.get_current_user()
 
+        # Extract just the UUID from account_id (e.g., "identity/accounts/xxx" -> "xxx")
+        account_id = user.get("account_id", "")
+        external_id = account_id.split("/")[-1] if account_id else ""
+
         identity = {
             "blox_id": user.get("account_infoblox_id"),
-            "external_id": user.get("account_id"),  # account_id for AWS IAM trust
+            "external_id": external_id,  # Just the UUID for AWS IAM trust
             "user_id": user.get("id"),
             "account_csp_id": user.get("account_csp_id"),
             "csp_id": user.get("csp_id")
