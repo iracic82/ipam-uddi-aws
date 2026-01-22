@@ -1,9 +1,11 @@
 ###############################################################################
-# AWS IPAM Lab - Main Configuration
+# AWS + Azure IPAM Lab - Main Configuration
 ###############################################################################
 # This creates:
-# 1. Base VPC infrastructure using module (VPC, Subnet, EC2, SG)
-# 2. AWS IPAM with Advanced tier (optional - for Infoblox integration)
+# 1. AWS VPC infrastructure using module (VPC, Subnet, EC2, SG)
+# 2. Azure VNet infrastructure using module (VNet, Subnet, VM, NSG)
+# 3. AWS IPAM with Advanced tier (for Infoblox integration)
+# 4. Overlapping IP ranges between AWS and Azure for demo
 ###############################################################################
 
 terraform {
@@ -14,12 +16,34 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 5.0"
     }
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = ">= 3.0"
+    }
+    tls = {
+      source  = "hashicorp/tls"
+      version = ">= 4.0"
+    }
   }
 }
 
-# Provider uses environment variables (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+# AWS Provider - uses environment variables
 provider "aws" {
   region = var.aws_region
+}
+
+# Azure Provider - North Europe with explicit credentials
+provider "azurerm" {
+  alias = "eun"
+  features {
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
+  subscription_id = var.subscription
+  client_id       = var.client
+  client_secret   = var.clientsecret
+  tenant_id       = var.tenantazure
 }
 
 ###############################################################################
@@ -33,7 +57,8 @@ locals {
     ResourceOwner = "lab-user"
   }
 
-  user_data = file("${path.module}/../scripts/aws-user-data.sh")
+  aws_user_data   = file("${path.module}/../scripts/aws-user-data.sh")
+  azure_user_data = file("${path.module}/../scripts/azure-user-data.sh")
 
   # Read blox_id from identity_output.json if not provided via variable
   identity_data = var.infoblox_resource_identifier != "" ? null : (
@@ -45,7 +70,7 @@ locals {
 }
 
 ###############################################################################
-# Base VPC Infrastructure - Using Module
+# AWS VPC Infrastructure - Using Module
 ###############################################################################
 module "vpc" {
   source   = "./modules/aws-vpc"
@@ -60,10 +85,41 @@ module "vpc" {
   enable_internet = each.value.enable_internet
   create_ec2      = each.value.create_ec2
   instance_type   = var.instance_type
-  user_data       = local.user_data
+  user_data       = local.aws_user_data
 
   tags = merge(local.common_tags, {
-    VPC = each.key
+    VPC   = each.key
+    Cloud = "AWS"
+  })
+}
+
+###############################################################################
+# Azure VNet Infrastructure - Using Module (Overlapping IP for Demo)
+###############################################################################
+module "vnet" {
+  source   = "./modules/azure-vnet"
+  for_each = var.vnets
+
+  providers = {
+    azurerm = azurerm.eun
+  }
+
+  resource_group_name = each.value.resource_group_name
+  location            = each.value.location
+  vnet_name           = each.value.vnet_name
+  vnet_cidr           = each.value.vnet_cidr
+  subnet_name         = each.value.subnet_name
+  subnet_cidr         = each.value.subnet_cidr
+  private_ip          = each.value.private_ip
+  vm_name             = each.value.vm_name
+  enable_internet     = each.value.enable_internet
+  create_vm           = each.value.create_vm
+  vm_size             = var.azure_vm_size
+  user_data           = local.azure_user_data
+
+  tags = merge(local.common_tags, {
+    VNet  = each.key
+    Cloud = "Azure"
   })
 }
 

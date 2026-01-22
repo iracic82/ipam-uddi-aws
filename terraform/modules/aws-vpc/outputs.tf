@@ -41,3 +41,13 @@ output "public_ip" {
   description = "Public IP of the EC2 instance"
   value       = var.enable_internet && var.create_ec2 ? aws_eip.main[0].public_ip : null
 }
+
+output "ssh_private_key_path" {
+  description = "Path to the SSH private key"
+  value       = var.create_ec2 ? "${path.root}/${var.ec2_name}-aws.pem" : null
+}
+
+output "ssh_command" {
+  description = "SSH command to connect to the EC2 instance"
+  value       = var.enable_internet && var.create_ec2 ? "ssh -i '${var.ec2_name}-aws.pem' ec2-user@${aws_eip.main[0].public_ip}" : null
+}

@@ -9,6 +9,10 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 5.0"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = ">= 4.0"
+    }
   }
 }
 
@@ -135,6 +139,27 @@ data "aws_ami" "amazon_linux_2" {
   }
 }
 
+# SSH Key Pair
+resource "tls_private_key" "ssh_key" {
+  count     = var.create_ec2 ? 1 : 0
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource "aws_key_pair" "main" {
+  count      = var.create_ec2 ? 1 : 0
+  key_name   = "${var.ec2_name}-key"
+  public_key = tls_private_key.ssh_key[0].public_key_openssh
+}
+
+# Save private key locally
+resource "local_sensitive_file" "private_key" {
+  count           = var.create_ec2 ? 1 : 0
+  content         = tls_private_key.ssh_key[0].private_key_pem
+  filename        = "${path.root}/${var.ec2_name}-aws.pem"
+  file_permission = "0400"
+}
+
 # Network Interface
 resource "aws_network_interface" "main" {
   count           = var.create_ec2 ? 1 : 0
@@ -152,6 +177,7 @@ resource "aws_instance" "main" {
   count         = var.create_ec2 ? 1 : 0
   ami           = data.aws_ami.amazon_linux_2.id
   instance_type = var.instance_type
+  key_name      = aws_key_pair.main[0].key_name
 
   network_interface {
     network_interface_id = aws_network_interface.main[0].id
