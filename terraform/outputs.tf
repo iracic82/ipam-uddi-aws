@@ -7,12 +7,12 @@
 ###############################################################################
 output "ipam_id" {
   description = "The ID of the AWS IPAM"
-  value       = local.ipam_id
+  value       = aws_vpc_ipam.main.id
 }
 
 output "ipam_arn" {
   description = "The ARN of the AWS IPAM"
-  value       = local.create_ipam ? aws_vpc_ipam.main[0].arn : "existing-ipam"
+  value       = aws_vpc_ipam.main.arn
 }
 
 output "ipam_region" {
@@ -120,7 +120,7 @@ output "summary" {
   description = "Summary of created resources"
   value = {
     ipam = {
-      id     = local.ipam_id
+      id     = aws_vpc_ipam.main.id
       region = var.aws_region
       tier   = "advanced"
     }
