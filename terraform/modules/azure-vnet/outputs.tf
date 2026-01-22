@@ -19,7 +19,7 @@ output "vnet_name" {
 
 output "vnet_cidr" {
   description = "CIDR block of the VNet"
-  value       = azurerm_virtual_network.main.address_space[0]
+  value       = tolist(azurerm_virtual_network.main.address_space)[0]
 }
 
 output "subnet_id" {
