@@ -126,20 +126,7 @@ module "vnet" {
 ###############################################################################
 # AWS IPAM - Advanced Tier (Required for Infoblox Integration)
 ###############################################################################
-# Look up existing IPAM first
-data "aws_vpc_ipams" "existing" {}
-
-locals {
-  # Use existing IPAM if available, otherwise create new one
-  # Handle case where ipams might be null (no IPAM exists yet)
-  existing_ipams   = coalesce(try(data.aws_vpc_ipams.existing.ipams, []), [])
-  existing_ipam_id = length(local.existing_ipams) > 0 ? local.existing_ipams[0].id : null
-  create_ipam      = local.existing_ipam_id == null
-  ipam_id          = local.create_ipam ? aws_vpc_ipam.main[0].id : local.existing_ipam_id
-}
-
 resource "aws_vpc_ipam" "main" {
-  count       = local.create_ipam ? 1 : 0
   description = "IPAM for Infoblox Integration"
   tier        = "advanced"
 
@@ -154,7 +141,7 @@ resource "aws_vpc_ipam" "main" {
 
 # Custom Private Scope for Infoblox
 resource "aws_vpc_ipam_scope" "infoblox" {
-  ipam_id     = local.ipam_id
+  ipam_id     = aws_vpc_ipam.main.id
   description = "Scope managed by Infoblox UDDI"
 
   tags = merge(local.common_tags, {
