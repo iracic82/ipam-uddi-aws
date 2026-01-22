@@ -172,8 +172,11 @@ output "ssh_quick_reference" {
   ==========================================
   IP Overlap Demo
   ==========================================
+  Overlapping IP Block:    10.100.0.0/16
+  Overlaps:                2 (AWS + Azure)
+
   AWS Production Pool:     10.100.0.0/16
-  Azure Legacy-OnPrem:     10.100.50.0/24  <-- OVERLAPS!
+  Azure Legacy-OnPrem:     10.100.0.0/16  <-- SAME CIDR!
 
   This demonstrates how Infoblox Federated IPAM
   detects IP conflicts across hybrid environments.
