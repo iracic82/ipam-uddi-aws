@@ -164,10 +164,10 @@ output "ssh_quick_reference" {
   ==========================================
 
   AWS Instances:
-  ${join("\n  ", [for k, v in module.vpc : v.public_ip != null ? "  ${k}: ssh -i '${k}-server-aws.pem' ec2-user@${v.public_ip}" : "  ${k}: No public IP"])}
+  ${join("\n  ", [for k, v in module.vpc : v.ssh_command != null ? "  ${k}: ${v.ssh_command}" : "  ${k}: No public IP"])}
 
   Azure VMs:
-  ${join("\n  ", [for k, v in module.vnet : v.public_ip != null ? "  ${k}: ssh -i '${v.vnet_name}-azure.pem' azureuser@${v.public_ip}" : "  ${k}: No public IP"])}
+  ${join("\n  ", [for k, v in module.vnet : v.ssh_command != null ? "  ${k}: ${v.ssh_command}" : "  ${k}: No public IP"])}
 
   ==========================================
   IP Overlap Demo
