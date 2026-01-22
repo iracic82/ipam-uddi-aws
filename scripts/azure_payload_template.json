@@ -1,0 +1,99 @@
+{
+  "name": "azure_discovery_instruqt",
+  "provider_type": "Microsoft Azure",
+  "account_preference": "single",
+  "sync_interval": "15",
+  "desired_state": "enabled",
+  "credential_preference": {
+    "credential_type": "static"
+  },
+  "destination_types_enabled": ["DNS", "IPAM/DHCP"],
+  "source_configs": [
+    {
+      "cloud_credential_id": "{{cloud_credential_id}}",
+      "restricted_to_accounts": ["{{subscription_id}}"],
+      "credential_config": {
+        "access_identifier": ""
+      }
+    }
+  ],
+  "additional_config": {
+    "excluded_accounts": [],
+    "forward_zone_enabled": false,
+    "internal_ranges_enabled": false,
+    "federated_realms": [],
+    "object_type": {
+      "version": 1,
+      "discover_new": true,
+      "objects": [
+        {
+          "category": { "id": "security", "excluded": false },
+          "resource_set": [{ "id": "security_groups", "excluded": false }]
+        },
+        {
+          "category": { "id": "compute", "excluded": false },
+          "resource_set": [
+            { "id": "tenants", "excluded": false },
+            { "id": "azure_managementgroups_management_groups", "excluded": false },
+            { "id": "metrics", "excluded": false }
+          ]
+        },
+        {
+          "category": { "id": "networking-basics", "excluded": false },
+          "resource_set": [
+            { "id": "public-ips", "excluded": false },
+            { "id": "network-interfaces", "excluded": false },
+            { "id": "network-interface-ip-configurations", "excluded": false },
+            { "id": "network-nat-gateways", "excluded": false },
+            { "id": "network-vpn-gateways", "excluded": false },
+            { "id": "network-route-tables", "excluded": false },
+            { "id": "network-vnet-gateways", "excluded": false },
+            { "id": "private-link-service", "excluded": false },
+            { "id": "private-endpoints", "excluded": false },
+            { "id": "network-watcher-flow-logs", "excluded": false },
+            { "id": "network-watchers", "excluded": false },
+            { "id": "network-nat-gateways-connections", "excluded": false },
+            { "id": "network-nat-application-gateways", "excluded": false },
+            { "id": "azure_network_azure_firewalls", "excluded": false },
+            { "id": "azure_network_virtual_wans", "excluded": false },
+            { "id": "azure_network_virtual_hubs", "excluded": false }
+          ]
+        },
+        {
+          "category": { "id": "lbs", "excluded": false },
+          "resource_set": [
+            { "id": "network-load-balancers", "excluded": false }
+          ]
+        },
+        {
+          "category": { "id": "azure-storage", "excluded": false },
+          "resource_set": [
+            { "id": "storage-containers", "excluded": false },
+            { "id": "storage-accounts", "excluded": false }
+          ]
+        }
+      ]
+    }
+  },
+  "destinations": [
+    {
+      "destination_type": "DNS",
+      "config": {
+        "dns": {
+          "consolidated_zone_data_enabled": true,
+          "view_id": "{{dns_view_id}}",
+          "sync_type": "read_only",
+          "resolver_endpoints_sync_enabled": false
+        }
+      }
+    },
+    {
+      "destination_type": "IPAM/DHCP",
+      "config": {
+        "ipam": {
+          "disable_ipam_projection": false
+        }
+      }
+    }
+  ]
+}
