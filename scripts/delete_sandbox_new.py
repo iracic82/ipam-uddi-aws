@@ -29,14 +29,16 @@ print(f"🗑️  Deleting sandbox: {sandbox_id}")
 api = SandboxAccountAPI(base_url=BASE_URL, token=TOKEN)
 delete_response = api.delete_sandbox_account(sandbox_id)
 
-if delete_response["status"] == "success":
+# delete_sandbox_account may return a bool or a dict
+if delete_response is True or (isinstance(delete_response, dict) and delete_response.get("status") == "success"):
     print(f"✅ Sandbox {sandbox_id} deleted successfully.")
 
     # Clean up local files
-    for filename in ["sandbox_id.txt", "external_id.txt", "sfdc_account_id.txt", "sandbox_env.sh"]:
+    for filename in ["sandbox_id.txt", "external_id.txt", "sfdc_account_id.txt", "sandbox_name.txt", "sandbox_env.sh"]:
         if os.path.exists(filename):
             os.remove(filename)
             print(f"🧹 Removed {filename}")
 else:
-    print(f"❌ Sandbox deletion failed: {delete_response.get('error', 'unknown error')}")
+    error = delete_response.get("error", "unknown error") if isinstance(delete_response, dict) else str(delete_response)
+    print(f"❌ Sandbox deletion failed: {error}")
     sys.exit(1)
