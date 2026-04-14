@@ -151,11 +151,11 @@ class InfobloxVPCDeployer:
                 return block, block_uuid
         raise ValueError(f"❌ No federated block found for pool {pool_id}")
 
-    def list_next_available_block(self, parent_block_uuid, cidr, count=1):
-        """Read-only: preview next available block without allocating."""
-        url = f"{self.base_url}/api/ddi/v1/federation/federated_block/{parent_block_uuid}/next_available_federated_block"
+    def list_next_available_reserved_block(self, parent_block_uuid, cidr, count=1):
+        """Read-only: preview next available reserved block without allocating."""
+        url = f"{self.base_url}/api/ddi/v1/federation/federated_block/{parent_block_uuid}/next_available_reserved_block"
         params = {"cidr": cidr, "count": count}
-        print(f"🔍 Listing next available /{cidr} from block {parent_block_uuid}...")
+        print(f"🔍 Listing next available /{cidr} reserved block from {parent_block_uuid}...")
         r = requests.get(url, headers=self.headers, params=params)
         r.raise_for_status()
         results = r.json().get("results", [])
@@ -165,40 +165,22 @@ class InfobloxVPCDeployer:
         print(f"✅ Next available: {block.get('address')}/{block.get('cidr')}")
         return block.get("address"), block.get("cidr")
 
-    def allocate_federated_block(self, parent_block_uuid, cidr, name, comment=""):
-        """Allocate (create) next available federated block."""
-        url = f"{self.base_url}/api/ddi/v1/federation/federated_block/{parent_block_uuid}/next_available_federated_block"
+    def allocate_reserved_block(self, parent_block_uuid, cidr, name, comment=""):
+        """Allocate next available reserved block → creates custom-allocation in AWS IPAM."""
+        url = f"{self.base_url}/api/ddi/v1/federation/federated_block/{parent_block_uuid}/next_available_reserved_block"
         payload = {"cidr": cidr, "count": 1, "name": name, "comment": comment}
-        print(f"📤 Allocating next available /{cidr} as '{name}'...")
+        print(f"📤 Allocating next available /{cidr} reserved block as '{name}'...")
         r = requests.post(url, headers=self.headers, json=payload)
         r.raise_for_status()
         results = r.json().get("results", [])
         if not results:
             raise RuntimeError("❌ Allocation returned no results")
         block = results[0]
-        block_uuid = block["id"].split("/")[-1]
-        print(f"✅ Allocated: {block.get('address')}/{block.get('cidr')} (ID: {block_uuid})")
-        return block.get("address"), block.get("cidr"), block_uuid, block
-
-    def create_reserved_block(self, address, cidr, realm_id, name, comment="", federated_pool_id=None):
-        """Create reserved block → triggers custom-allocation in AWS IPAM."""
-        url = f"{self.base_url}/api/ddi/v1/federation/reserved_block"
-        payload = {
-            "address": address,
-            "cidr": cidr,
-            "federated_realm": realm_id,
-            "name": name,
-            "comment": comment
-        }
-        if federated_pool_id:
-            payload["federated_pool_id"] = federated_pool_id
-        print(f"📤 Creating reserved block {address}/{cidr}...")
-        r = requests.post(url, headers=self.headers, json=payload)
-        r.raise_for_status()
-        result = r.json().get("result", {})
-        print(f"✅ Reserved block created: {address}/{cidr} → ID: {result.get('id')}")
+        block_id = block.get("id", "")
+        block_uuid = block_id.split("/")[-1] if block_id else ""
+        print(f"✅ Reserved block allocated: {block.get('address')}/{block.get('cidr')} (ID: {block_uuid})")
         print("   ↳ Custom-allocation will appear in AWS IPAM under APPS pool")
-        return result
+        return block.get("address"), block.get("cidr"), block_uuid, block
 
     # --- AWS ---
 
@@ -289,40 +271,32 @@ def main():
     print(f"   Pool: {args.pool_name} ({pool_id})")
     print(f"{'='*60}\n")
 
-    # Step 1: Preview
-    vpc_address, vpc_cidr = deployer.list_next_available_block(block_uuid, args.vpc_cidr)
+    # Step 1: Preview next available /24 reserved block
+    vpc_address, vpc_cidr = deployer.list_next_available_reserved_block(block_uuid, args.vpc_cidr)
 
     if args.dry_run:
         print(f"\n🔍 DRY RUN — Would allocate:")
         print(f"   VPC:    {vpc_address}/{vpc_cidr}")
-        print(f"   Subnet: next available /{args.subnet_cidr} from above")
-        print(f"   + Reserved Block (pool: {pool_id}), IGW, Route Table")
+        print(f"   Subnet: /{args.subnet_cidr} from above")
+        print(f"   + Reserved Block in APPS pool, IGW, Route Table")
         return
 
-    # Step 2: Allocate /24 in Infoblox from the APPS block
-    alloc_addr, alloc_cidr, alloc_uuid, alloc_block = deployer.allocate_federated_block(
+    # Step 2: Allocate /24 reserved block from APPS → custom-allocation in AWS IPAM
+    alloc_addr, alloc_cidr, alloc_uuid, alloc_block = deployer.allocate_reserved_block(
         block_uuid, args.vpc_cidr,
-        name=f"{args.vpc_name}-block",
-        comment=f"VPC block for {args.vpc_name}"
+        name=f"{args.vpc_name}-reserved",
+        comment=f"Reserved for {args.vpc_name}"
     )
     vpc_cidr_block = f"{alloc_addr}/{alloc_cidr}"
 
     # Step 3: Create VPC
     vpc_id = deployer.create_aws_vpc(vpc_cidr_block, name=args.vpc_name)
 
-    # Step 4: Get next available /25 for subnet
-    subnet_addr, subnet_cidr = deployer.list_next_available_block(alloc_uuid, args.subnet_cidr)
-    subnet_cidr_block = f"{subnet_addr}/{subnet_cidr}"
+    # Step 4: Subnet CIDR is the first /25 within the /24
+    # Since the reserved block is a leaf, we just use the first half
+    subnet_cidr_block = f"{alloc_addr}/{args.subnet_cidr}"
 
-    # Step 5: Create Reserved Block → custom-allocation in AWS IPAM APPS pool
-    deployer.create_reserved_block(
-        alloc_addr, alloc_cidr, realm_id,
-        name=f"{args.vpc_name}-reserved",
-        comment=f"Reserved for {args.vpc_name}",
-        federated_pool_id=pool_id
-    )
-
-    # Step 6: Create Subnet
+    # Step 5: Create Subnet
     subnet_id = deployer.create_aws_subnet(vpc_id, subnet_cidr_block, name=f"{args.vpc_name}-subnet")
 
     # Step 7: Create IGW + Route Table
@@ -336,11 +310,11 @@ def main():
         "igw": {"id": igw_id},
         "route_table": {"id": rt_id},
         "infoblox": {
-            "federated_block_id": alloc_block.get("id"),
-            "federated_block_uuid": alloc_uuid,
+            "reserved_block_id": alloc_block.get("id"),
+            "reserved_block_uuid": alloc_uuid,
             "parent_block": f"{block.get('address')}/{block.get('cidr')}",
             "realm_id": realm_id,
-            "federated_pool_id": pool_id
+            "pool_id": pool_id
         }
     }
     with open("vpc_deployment_output.json", "w") as f:
@@ -352,8 +326,7 @@ def main():
     print(f"   Subnet:       {subnet_id} ({subnet_cidr_block})")
     print(f"   IGW:          {igw_id}")
     print(f"   Route Table:  {rt_id} (0.0.0.0/0 → IGW)")
-    print(f"   IPAM Block:   {alloc_block.get('id')}")
-    print(f"   Reserved:     ✅ Custom-allocation in AWS IPAM")
+    print(f"   Reserved:     {alloc_block.get('id')} → custom-allocation in APPS pool")
     print(f"\n   📄 Output → vpc_deployment_output.json")
     print(f"{'='*60}")
     print("\n🔍 Next steps:")
