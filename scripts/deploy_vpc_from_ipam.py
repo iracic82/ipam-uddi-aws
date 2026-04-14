@@ -100,6 +100,37 @@ class InfobloxVPCDeployer:
             raise ValueError("❌ Could not find realm.id in federation_output.json")
         return realm_id
 
+    def find_child_block_by_name(self, name):
+        """Find a federated block by name via API (e.g. 'APPS' sub-block)."""
+        url = f"{self.base_url}/api/ddi/v1/federation/federated_block"
+        params = {"_filter": f'name=="{name}"'}
+        r = requests.get(url, headers=self.headers, params=params)
+        r.raise_for_status()
+        results = r.json().get("results", [])
+        if not results:
+            raise ValueError(f"❌ Federated block '{name}' not found via API")
+        block = results[0]
+        block_uuid = block["id"].split("/")[-1]
+        print(f"📖 Found '{name}' block: {block.get('address')}/{block.get('cidr')} (ID: {block_uuid})")
+        return block, block_uuid
+
+    def find_federated_pool(self, pool_name=None):
+        """Find federated pool by name, or return the first one."""
+        url = f"{self.base_url}/api/ddi/v1/federation/federated_pool"
+        params = {}
+        if pool_name:
+            params["_filter"] = f'name=="{pool_name}"'
+        r = requests.get(url, headers=self.headers, params=params)
+        r.raise_for_status()
+        results = r.json().get("results", [])
+        if not results:
+            print("⚠️  No federated pool found, reserved block will not be linked to a pool")
+            return None
+        pool = results[0]
+        pool_id = pool.get("id")
+        print(f"📖 Found federated pool: {pool.get('name')} (ID: {pool_id})")
+        return pool_id
+
     def list_next_available_block(self, parent_block_uuid, cidr, count=1):
         """Read-only: preview next available block without allocating."""
         url = f"{self.base_url}/api/ddi/v1/federation/federated_block/{parent_block_uuid}/next_available_federated_block"
@@ -129,7 +160,7 @@ class InfobloxVPCDeployer:
         print(f"✅ Allocated: {block.get('address')}/{block.get('cidr')} (ID: {block_uuid})")
         return block.get("address"), block.get("cidr"), block_uuid, block
 
-    def create_reserved_block(self, address, cidr, realm_id, name, comment=""):
+    def create_reserved_block(self, address, cidr, realm_id, name, comment="", federated_pool_id=None):
         """Create reserved block → triggers custom-allocation in AWS IPAM."""
         url = f"{self.base_url}/api/ddi/v1/federation/reserved_block"
         payload = {
@@ -139,12 +170,14 @@ class InfobloxVPCDeployer:
             "name": name,
             "comment": comment
         }
+        if federated_pool_id:
+            payload["federated_pool_id"] = federated_pool_id
         print(f"📤 Creating reserved block {address}/{cidr}...")
         r = requests.post(url, headers=self.headers, json=payload)
         r.raise_for_status()
         result = r.json().get("result", {})
         print(f"✅ Reserved block created: {address}/{cidr} → ID: {result.get('id')}")
-        print("   ↳ Custom-allocation will appear in AWS IPAM")
+        print("   ↳ Custom-allocation will appear in AWS IPAM under APPS pool")
         return result
 
     # --- AWS ---
@@ -213,7 +246,8 @@ def main():
     parser = argparse.ArgumentParser(description="Deploy AWS VPC from Infoblox Federated IPAM")
     parser.add_argument("--vpc-cidr", type=int, default=24, help="CIDR prefix for VPC (default: 24)")
     parser.add_argument("--subnet-cidr", type=int, default=25, help="CIDR prefix for subnet (default: 25)")
-    parser.add_argument("--block-name", default="AWS", help="Parent federated block name (default: AWS)")
+    parser.add_argument("--block-name", default="APPS", help="Federated block to allocate from (default: APPS)")
+    parser.add_argument("--pool-name", default=None, help="Federated pool name (auto-detected if not set)")
     parser.add_argument("--vpc-name", default="apps-vpc-from-ipam", help="Name tag for the VPC")
     parser.add_argument("--dry-run", action="store_true", help="Preview allocations without creating resources")
     args = parser.parse_args()
@@ -222,13 +256,14 @@ def main():
     deployer.authenticate()
     deployer.switch_account()
 
-    # Find parent block and realm
-    block, block_uuid = deployer.get_aws_block(block_name=args.block_name)
+    # Find the target block (APPS by default, not the top-level AWS /8)
+    block, block_uuid = deployer.find_child_block_by_name(args.block_name)
     realm_id = deployer.get_realm_id()
+    pool_id = deployer.find_federated_pool(pool_name=args.pool_name)
 
     print(f"\n{'='*60}")
     print(f"📋 Plan: /{args.vpc_cidr} VPC + /{args.subnet_cidr} Subnet")
-    print(f"   Parent: {block.get('name')} ({block.get('address')}/{block.get('cidr')})")
+    print(f"   From block: {block.get('name')} ({block.get('address')}/{block.get('cidr')})")
     print(f"{'='*60}\n")
 
     # Step 1: Preview
@@ -238,10 +273,10 @@ def main():
         print(f"\n🔍 DRY RUN — Would allocate:")
         print(f"   VPC:    {vpc_address}/{vpc_cidr}")
         print(f"   Subnet: next available /{args.subnet_cidr} from above")
-        print(f"   + Reserved Block, IGW, Route Table")
+        print(f"   + Reserved Block (pool: {pool_id}), IGW, Route Table")
         return
 
-    # Step 2: Allocate /24 in Infoblox
+    # Step 2: Allocate /24 in Infoblox from the APPS block
     alloc_addr, alloc_cidr, alloc_uuid, alloc_block = deployer.allocate_federated_block(
         block_uuid, args.vpc_cidr,
         name=f"{args.vpc_name}-block",
@@ -256,11 +291,12 @@ def main():
     subnet_addr, subnet_cidr = deployer.list_next_available_block(alloc_uuid, args.subnet_cidr)
     subnet_cidr_block = f"{subnet_addr}/{subnet_cidr}"
 
-    # Step 5: Create Reserved Block → custom-allocation in AWS IPAM
+    # Step 5: Create Reserved Block → custom-allocation in AWS IPAM APPS pool
     deployer.create_reserved_block(
         alloc_addr, alloc_cidr, realm_id,
         name=f"{args.vpc_name}-reserved",
-        comment=f"Reserved for {args.vpc_name}"
+        comment=f"Reserved for {args.vpc_name}",
+        federated_pool_id=pool_id
     )
 
     # Step 6: Create Subnet
@@ -280,7 +316,8 @@ def main():
             "federated_block_id": alloc_block.get("id"),
             "federated_block_uuid": alloc_uuid,
             "parent_block": args.block_name,
-            "realm_id": realm_id
+            "realm_id": realm_id,
+            "federated_pool_id": pool_id
         }
     }
     with open("vpc_deployment_output.json", "w") as f:
