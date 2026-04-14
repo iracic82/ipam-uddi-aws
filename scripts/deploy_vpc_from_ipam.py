@@ -103,6 +103,19 @@ class InfobloxVPCDeployer:
                 return pool_id
         raise ValueError(f"❌ Pool '{pool_name}' not found")
 
+    def find_block_for_pool(self, pool_id):
+        """Find the federated block linked to a specific pool."""
+        url = f"{self.base_url}/api/ddi/v1/federation/federated_block"
+        r = requests.get(url, headers=self.headers)
+        r.raise_for_status()
+        for b in r.json().get("results", []):
+            if b.get("federated_pool_id") == pool_id:
+                block_uuid = b["id"].split("/")[-1]
+                name = b.get("name") or "(unnamed)"
+                print(f"📖 Found block for pool: {name} {b.get('address')}/{b.get('cidr')} (ID: {block_uuid})")
+                return b, block_uuid
+        raise ValueError(f"❌ No federated block found for pool {pool_id}")
+
     def get_next_available_block(self, block_uuid, cidr):
         """GET next available federated block from parent (read-only)."""
         url = f"{self.base_url}/api/ddi/v1/federation/federated_block/{block_uuid}/next_available_federated_block"
@@ -211,18 +224,18 @@ def main():
     deployer.authenticate()
     deployer.switch_account()
 
-    # Find AWS block, realm, and APPS pool
-    block, block_uuid = deployer.get_aws_block(block_name="AWS")
+    # Find APPS pool → its block (10.10.0.0/16) → realm
     realm_id = deployer.get_realm_id()
     apps_pool_id = deployer.find_apps_pool_id(pool_name=args.pool_name)
+    block, block_uuid = deployer.find_block_for_pool(apps_pool_id)
 
     print(f"\n{'='*60}")
     print(f"📋 Plan: /{args.vpc_cidr} VPC + /{args.subnet_cidr} Subnet")
-    print(f"   Block: AWS ({block.get('address')}/{block.get('cidr')})")
+    print(f"   Block: {block.get('address')}/{block.get('cidr')}")
     print(f"   Pool:  {args.pool_name} ({apps_pool_id})")
     print(f"{'='*60}\n")
 
-    # Step 1: GET next available /24 from AWS block
+    # Step 1: GET next available /24 from APPS block (10.10.0.0/16)
     vpc_addr, vpc_cidr = deployer.get_next_available_block(block_uuid, args.vpc_cidr)
     vpc_cidr_block = f"{vpc_addr}/{vpc_cidr}"
 
