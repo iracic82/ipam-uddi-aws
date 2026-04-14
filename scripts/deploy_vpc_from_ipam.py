@@ -246,7 +246,7 @@ def main():
     parser = argparse.ArgumentParser(description="Deploy AWS VPC from Infoblox Federated IPAM")
     parser.add_argument("--vpc-cidr", type=int, default=24, help="CIDR prefix for VPC (default: 24)")
     parser.add_argument("--subnet-cidr", type=int, default=25, help="CIDR prefix for subnet (default: 25)")
-    parser.add_argument("--block-name", default="APPS", help="Federated block to allocate from (default: APPS)")
+    parser.add_argument("--block-name", default="AWS", help="Federated block to allocate from (default: AWS)")
     parser.add_argument("--pool-name", default=None, help="Federated pool name (auto-detected if not set)")
     parser.add_argument("--vpc-name", default="apps-vpc-from-ipam", help="Name tag for the VPC")
     parser.add_argument("--dry-run", action="store_true", help="Preview allocations without creating resources")
@@ -256,8 +256,12 @@ def main():
     deployer.authenticate()
     deployer.switch_account()
 
-    # Find the target block (APPS by default, not the top-level AWS /8)
-    block, block_uuid = deployer.find_child_block_by_name(args.block_name)
+    # Find the target block — try API first, fall back to federation_output.json
+    try:
+        block, block_uuid = deployer.find_child_block_by_name(args.block_name)
+    except ValueError:
+        print(f"⚠️  Block '{args.block_name}' not found via API, checking federation_output.json...")
+        block, block_uuid = deployer.get_aws_block(block_name=args.block_name)
     realm_id = deployer.get_realm_id()
     pool_id = deployer.find_federated_pool(pool_name=args.pool_name)
 
