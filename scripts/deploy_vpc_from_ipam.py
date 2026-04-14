@@ -2,7 +2,7 @@
 """
 Deploy AWS VPC using CIDR allocated from Infoblox Federated IPAM.
 
-Flow (per ENG):
+Flow:
   1. GET next available /24 from AWS federated block (10.0.0.0/8)
   2. Create AWS VPC with that /24
   3. GET next available /25 for subnet
