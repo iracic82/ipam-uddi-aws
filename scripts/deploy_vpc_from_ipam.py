@@ -226,10 +226,11 @@ def main():
     deployer.authenticate()
     deployer.switch_account()
 
-    # Find APPS pool → its block (10.10.0.0/16) → realm
-    realm_id = deployer.get_realm_id()
+    # Find APPS pool → its block (10.10.0.0/16) → use block's own realm
     apps_pool_id = deployer.find_apps_pool_id(pool_name=args.pool_name)
     block, block_uuid = deployer.find_block_for_pool(apps_pool_id)
+    realm_id = block.get("federated_realm")
+    print(f"📖 Using block's realm: {realm_id}")
 
     print(f"\n{'='*60}")
     print(f"📋 Plan: /{args.vpc_cidr} VPC + /{args.subnet_cidr} Subnet")
