@@ -145,6 +145,8 @@ class InfobloxVPCDeployer:
             payload["comment"] = comment
         print(f"📤 POST reserved_block {address}/{cidr} (pool: {federated_pool_id})...")
         r = requests.post(url, headers=self.headers, json=payload)
+        if not r.ok:
+            print(f"❌ Error {r.status_code}: {r.text}")
         r.raise_for_status()
         result = r.json().get("result", {})
         print(f"✅ Reserved block created: {address}/{cidr} → {result.get('id')}")
@@ -250,10 +252,7 @@ def main():
         print(f"   Reserved Block: {vpc_addr}/{vpc_cidr} → APPS pool")
         return
 
-    # Step 3: Create VPC
-    vpc_id = deployer.create_aws_vpc(vpc_cidr_block, name=args.vpc_name)
-
-    # Step 4: POST reserved_block with APPS pool ID → custom-allocation
+    # Step 3: POST reserved_block FIRST → custom-allocation in AWS IPAM
     reserved = deployer.create_reserved_block(
         address=vpc_addr,
         cidr=vpc_cidr,
@@ -262,6 +261,9 @@ def main():
         name=f"{args.vpc_name}-reserved",
         comment=f"Reserved for {args.vpc_name}"
     )
+
+    # Step 4: Create VPC
+    vpc_id = deployer.create_aws_vpc(vpc_cidr_block, name=args.vpc_name)
 
     # Step 5: Create Subnet
     subnet_id = deployer.create_aws_subnet(vpc_id, subnet_cidr_block, name=f"{args.vpc_name}-subnet")
