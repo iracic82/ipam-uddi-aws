@@ -101,7 +101,7 @@ class InfobloxVPCDeployer:
         return realm_id
 
     def find_child_block_by_name(self, name):
-        """Find a federated block by name via API (e.g. 'APPS' sub-block)."""
+        """Find a federated block by name via API."""
         url = f"{self.base_url}/api/ddi/v1/federation/federated_block"
         params = {"_filter": f'name=="{name}"'}
         r = requests.get(url, headers=self.headers, params=params)
@@ -115,21 +115,41 @@ class InfobloxVPCDeployer:
         return block, block_uuid
 
     def find_federated_pool(self, pool_name=None):
-        """Find federated pool by name, or return the first one."""
+        """Find federated pool by name (substring match on name field)."""
         url = f"{self.base_url}/api/ddi/v1/federation/federated_pool"
-        params = {}
-        if pool_name:
-            params["_filter"] = f'name=="{pool_name}"'
-        r = requests.get(url, headers=self.headers, params=params)
+        r = requests.get(url, headers=self.headers)
         r.raise_for_status()
         results = r.json().get("results", [])
-        if not results:
-            print("⚠️  No federated pool found, reserved block will not be linked to a pool")
+        if pool_name:
+            # Pool names from AWS contain extra info like "APPS(ipam-pool-xxx)"
+            # so we do a substring/startswith match
+            for p in results:
+                pname = p.get("name", "")
+                if pname.startswith(pool_name) or pool_name in pname:
+                    print(f"📖 Found pool '{pname}' (ID: {p.get('id')})")
+                    return p.get("id")
+            print(f"⚠️  Pool '{pool_name}' not found, available: {[p.get('name') for p in results]}")
             return None
-        pool = results[0]
-        pool_id = pool.get("id")
-        print(f"📖 Found federated pool: {pool.get('name')} (ID: {pool_id})")
-        return pool_id
+        # Default: return first pool
+        if results:
+            pool = results[0]
+            print(f"📖 Found federated pool: {pool.get('name')} (ID: {pool.get('id')})")
+            return pool.get("id")
+        print("⚠️  No federated pool found")
+        return None
+
+    def find_block_by_pool(self, pool_id):
+        """Find the federated block associated with a specific pool."""
+        url = f"{self.base_url}/api/ddi/v1/federation/federated_block"
+        r = requests.get(url, headers=self.headers)
+        r.raise_for_status()
+        for block in r.json().get("results", []):
+            if block.get("federated_pool_id") == pool_id:
+                block_uuid = block["id"].split("/")[-1]
+                name = block.get("name") or "(unnamed)"
+                print(f"📖 Found block for pool: {name} {block.get('address')}/{block.get('cidr')} (ID: {block_uuid})")
+                return block, block_uuid
+        raise ValueError(f"❌ No federated block found for pool {pool_id}")
 
     def list_next_available_block(self, parent_block_uuid, cidr, count=1):
         """Read-only: preview next available block without allocating."""
@@ -246,8 +266,7 @@ def main():
     parser = argparse.ArgumentParser(description="Deploy AWS VPC from Infoblox Federated IPAM")
     parser.add_argument("--vpc-cidr", type=int, default=24, help="CIDR prefix for VPC (default: 24)")
     parser.add_argument("--subnet-cidr", type=int, default=25, help="CIDR prefix for subnet (default: 25)")
-    parser.add_argument("--block-name", default="AWS", help="Federated block to allocate from (default: AWS)")
-    parser.add_argument("--pool-name", default=None, help="Federated pool name (auto-detected if not set)")
+    parser.add_argument("--pool-name", default="APPS", help="AWS IPAM pool to allocate from (default: APPS)")
     parser.add_argument("--vpc-name", default="apps-vpc-from-ipam", help="Name tag for the VPC")
     parser.add_argument("--dry-run", action="store_true", help="Preview allocations without creating resources")
     args = parser.parse_args()
@@ -256,18 +275,18 @@ def main():
     deployer.authenticate()
     deployer.switch_account()
 
-    # Find the target block — try API first, fall back to federation_output.json
-    try:
-        block, block_uuid = deployer.find_child_block_by_name(args.block_name)
-    except ValueError:
-        print(f"⚠️  Block '{args.block_name}' not found via API, checking federation_output.json...")
-        block, block_uuid = deployer.get_aws_block(block_name=args.block_name)
-    realm_id = deployer.get_realm_id()
+    # Step 1: Find the APPS pool, then find its federated block
     pool_id = deployer.find_federated_pool(pool_name=args.pool_name)
+    if not pool_id:
+        print("❌ Cannot proceed without a pool")
+        sys.exit(1)
+    block, block_uuid = deployer.find_block_by_pool(pool_id)
+    realm_id = deployer.get_realm_id()
 
     print(f"\n{'='*60}")
     print(f"📋 Plan: /{args.vpc_cidr} VPC + /{args.subnet_cidr} Subnet")
-    print(f"   From block: {block.get('name')} ({block.get('address')}/{block.get('cidr')})")
+    print(f"   From block: {block.get('name') or '(unnamed)'} ({block.get('address')}/{block.get('cidr')})")
+    print(f"   Pool: {args.pool_name} ({pool_id})")
     print(f"{'='*60}\n")
 
     # Step 1: Preview
@@ -319,7 +338,7 @@ def main():
         "infoblox": {
             "federated_block_id": alloc_block.get("id"),
             "federated_block_uuid": alloc_uuid,
-            "parent_block": args.block_name,
+            "parent_block": f"{block.get('address')}/{block.get('cidr')}",
             "realm_id": realm_id,
             "federated_pool_id": pool_id
         }
