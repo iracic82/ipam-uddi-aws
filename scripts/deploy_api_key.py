@@ -48,6 +48,20 @@ class InfobloxSession:
 
         if not api_key:
             raise RuntimeError("❌ Failed to extract API key from response.")
+            
+        # --- Write Terraform auto tfvars for student ---
+        tfvars_path = "/home/student/lab/terraform-vpc-demo/terraform.auto.tfvars"
+
+        with open(tfvars_path, "w") as f:
+            f.write(f'ddi_api_key = "{api_key}"\n')
+
+        # Make sure student owns it
+        import os
+        os.chown(tfvars_path, 1000, 1000)
+
+        print(f"📝 Terraform variable written to {tfvars_path}")
+
+        
 
         # Save API key to ~/.bashrc
         bashrc_path = os.path.expanduser("~/.bashrc")
